@@ -1,0 +1,246 @@
+[
+  {
+    "id": "1749157243170_y5ehpp548",
+    "creator": "0x0e00cbc5384Db3529315135e11e0d8d13b444dB9",
+    "creatorName": "0x0e00...4dB9",
+    "betAmount": 18,
+    "gameType": "tictactoe",
+    "status": "playing",
+    "createdAt": "2025-06-05T21:00:43.170Z",
+    "opponent": "0x43E3e435ec4FEbcb183d2b80a43a36408045917e",
+    "opponentName": "0x43E3...917e",
+    "gameState": {
+      "board": [
+        [
+          "X",
+          "O",
+          "X"
+        ],
+        [
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "currentPlayer": "O",
+      "moveHistory": [
+        {
+          "player": "X",
+          "position": {
+            "row": 0,
+            "col": 0
+          },
+          "moveNumber": 1,
+          "timestamp": "2025-06-05T21:01:15.061Z"
+        },
+        {
+          "player": "O",
+          "position": {
+            "row": 0,
+            "col": 1
+          },
+          "moveNumber": 2,
+          "timestamp": "2025-06-05T21:02:45.104Z"
+        },
+        {
+          "player": "X",
+          "position": {
+            "row": 0,
+            "col": 2
+          },
+          "moveNumber": 3,
+          "timestamp": "2025-06-05T21:06:58.988Z"
+        }
+      ],
+      "moveNumber": 3,
+      "gameStatus": "playing",
+      "messages": []
+    }
+  },
+  {
+    "id": "1749157644272_d0o6kdsah",
+    "creator": "0x0e00cbc5384Db3529315135e11e0d8d13b444dB9",
+    "creatorName": "0x0e00...4dB9",
+    "betAmount": 14,
+    "gameType": "go",
+    "status": "finished",
+    "createdAt": "2025-06-05T21:07:24.272Z",
+    "opponent": "0x43E3e435ec4FEbcb183d2b80a43a36408045917e",
+    "opponentName": "0x43E3...917e",
+    "updatedAt": "2025-06-05T21:07:38.900Z"
+  },
+  {
+    "id": "1749157673375_zu8wa75af",
+    "creator": "0x0e00cbc5384Db3529315135e11e0d8d13b444dB9",
+    "creatorName": "0x0e00...4dB9",
+    "betAmount": 16,
+    "gameType": "tictactoe",
+    "status": "finished",
+    "createdAt": "2025-06-05T21:07:53.375Z",
+    "opponent": "0x43E3e435ec4FEbcb183d2b80a43a36408045917e",
+    "opponentName": "0x43E3...917e",
+    "gameState": {
+      "board": [
+        [
+          "O",
+          "O",
+          null
+        ],
+        [
+          "X",
+          "X",
+          "X"
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "currentPlayer": "O",
+      "moveHistory": [
+        {
+          "player": "X",
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "moveNumber": 1,
+          "timestamp": "2025-06-05T21:09:50.290Z"
+        },
+        {
+          "player": "O",
+          "position": {
+            "row": 0,
+            "col": 1
+          },
+          "moveNumber": 2,
+          "timestamp": "2025-06-05T21:09:52.592Z"
+        },
+        {
+          "player": "X",
+          "position": {
+            "row": 1,
+            "col": 1
+          },
+          "moveNumber": 3,
+          "timestamp": "2025-06-05T21:09:55.188Z"
+        },
+        {
+          "player": "O",
+          "position": {
+            "row": 0,
+            "col": 0
+          },
+          "moveNumber": 4,
+          "timestamp": "2025-06-05T21:09:58.522Z"
+        },
+        {
+          "player": "X",
+          "position": {
+            "row": 1,
+            "col": 2
+          },
+          "moveNumber": 5,
+          "timestamp": "2025-06-05T21:10:02.126Z"
+        }
+      ],
+      "moveNumber": 5,
+      "gameStatus": "finished",
+      "messages": [],
+      "winner": "X",
+      "newGameRequest": null
+    },
+    "winner": "0x0e00cbc5384Db3529315135e11e0d8d13b444dB9",
+    "updatedAt": "2025-06-05T21:10:18.598Z"
+  },
+  {
+    "id": "1749160005682_fmhpu8d6m",
+    "creator": "0x0e00cbc5384Db3529315135e11e0d8d13b444dB9",
+    "creatorName": "0x0e00...4dB9",
+    "betAmount": 100,
+    "gameType": "tictactoe",
+    "status": "finished",
+    "createdAt": "2025-06-05T21:46:45.682Z",
+    "opponent": "0x43E3e435ec4FEbcb183d2b80a43a36408045917e",
+    "opponentName": "0x43E3...917e",
+    "gameState": {
+      "board": [
+        [
+          "X",
+          "X",
+          "X"
+        ],
+        [
+          "O",
+          "O",
+          null
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "currentPlayer": "O",
+      "moveHistory": [
+        {
+          "player": "X",
+          "position": {
+            "row": 0,
+            "col": 0
+          },
+          "moveNumber": 1,
+          "timestamp": "2025-06-05T21:48:30.058Z"
+        },
+        {
+          "player": "O",
+          "position": {
+            "row": 1,
+            "col": 1
+          },
+          "moveNumber": 2,
+          "timestamp": "2025-06-05T21:48:33.811Z"
+        },
+        {
+          "player": "X",
+          "position": {
+            "row": 0,
+            "col": 1
+          },
+          "moveNumber": 3,
+          "timestamp": "2025-06-05T21:48:35.473Z"
+        },
+        {
+          "player": "O",
+          "position": {
+            "row": 1,
+            "col": 0
+          },
+          "moveNumber": 4,
+          "timestamp": "2025-06-05T21:48:38.036Z"
+        },
+        {
+          "player": "X",
+          "position": {
+            "row": 0,
+            "col": 2
+          },
+          "moveNumber": 5,
+          "timestamp": "2025-06-05T21:48:40.779Z"
+        }
+      ],
+      "moveNumber": 5,
+      "gameStatus": "finished",
+      "messages": [],
+      "winner": "X"
+    },
+    "winner": "0x0e00cbc5384Db3529315135e11e0d8d13b444dB9",
+    "updatedAt": "2025-06-05T21:48:12.398Z"
+  }
+]
