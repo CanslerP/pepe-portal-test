@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import GoGame from '../components/games/GoGame';
-import TicTacToeGame from '../components/games/TicTacToeGame';
 import GameLobby from '../components/games/GameLobby';
 import { usePepeShells } from '@/hooks/usePepeShells';
 import { useGameRooms, type GameRoom } from '@/hooks/useGameRooms';
@@ -178,8 +177,7 @@ const BackButton = styled.button`
 `;
 
 export default function GamesPage() {
-  const [currentView, setCurrentView] = useState<'lobby' | 'game'>('lobby');
-  const [currentGameRoom, setCurrentGameRoom] = useState<GameRoom | null>(null);
+  const router = useRouter();
   const { balance, deductShells, addShells, refreshBalance } = usePepeShells();
   const { 
     createGame, 
@@ -195,28 +193,6 @@ export default function GamesPage() {
 
   // Получаем актуальные игры, которые будут обновляться автоматически
   const availableGames = getAvailableGames();
-
-  // Автоматически обновляем данные текущей игры
-  useEffect(() => {
-    if (currentView === 'game' && currentGameRoom?.id) {
-      const interval = setInterval(() => {
-        refreshRooms();
-        const updatedGames = getAvailableGames();
-        const updatedRoom = updatedGames.find(r => r.id === currentGameRoom.id);
-        if (updatedRoom) {
-          // Проверяем, завершилась ли игра
-          if (currentGameRoom.status !== 'finished' && updatedRoom.status === 'finished') {
-            console.log('Game finished detected, refreshing balance...');
-            refreshBalance(); // Обновляем баланс при завершении игры
-          }
-          // Всегда обновляем данные игры (включая сообщения чата)
-          setCurrentGameRoom(updatedRoom);
-        }
-      }, 2000); // Обновляем каждые 2 секунды
-
-      return () => clearInterval(interval);
-    }
-  }, [currentView, currentGameRoom?.id, refreshRooms, getAvailableGames, refreshBalance]);
 
   const handleCreateGame = async (gameData: Omit<GameRoom, 'id' | 'createdAt'>) => {
     if (!account?.address) return;
@@ -281,42 +257,16 @@ export default function GamesPage() {
       }
     }
     
-    // ВАЖНО: получаем обновленные данные комнаты после присоединения
-    refreshRooms();
-    
-    // Ждем небольшую задержку для синхронизации
-    setTimeout(() => {
-      const updatedGames = getAvailableGames();
-      const updatedRoom = updatedGames.find(r => r.id === roomId);
-      
-      if (updatedRoom) {
-        console.log('Setting current game room:', updatedRoom);
-        setCurrentGameRoom(updatedRoom);
-        setCurrentView('game');
-      } else {
-        alert('Ошибка загрузки игры!');
-      }
-    }, 500);
-  };
-
-  const handleBackToLobby = () => {
-    setCurrentView('lobby');
-    setCurrentGameRoom(null);
+    // Перенаправляем на страницу игры
+    router.push(`/games/${roomId}`);
   };
 
   const handleCancelGame = async (roomId: string) => {
     if (!account?.address) return;
 
     try {
-      const response = await fetch(`/api/game-rooms/${roomId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'cancel',
-          player: account.address
-        })
+      const response = await fetch(`/api/game-rooms/room?id=${roomId}`, {
+        method: 'DELETE',
       });
 
       const data = await response.json();
@@ -334,29 +284,6 @@ export default function GamesPage() {
       alert('Ошибка при отмене игры');
     }
   };
-
-  if (currentView === 'game' && currentGameRoom) {
-    return (
-      <GamesContainer>
-        <ContentWrapper>
-          <BackButton onClick={handleBackToLobby}>
-            ← Назад к лобби
-          </BackButton>
-          <GameArea
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {currentGameRoom.gameType === 'tictactoe' ? (
-              <TicTacToeGame gameRoom={currentGameRoom} />
-            ) : (
-              <GoGame gameRoom={currentGameRoom} />
-            )}
-          </GameArea>
-        </ContentWrapper>
-      </GamesContainer>
-    );
-  }
 
   return (
     <GamesContainer>
