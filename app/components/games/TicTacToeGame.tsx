@@ -624,7 +624,7 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     if (!gameRoom?.id || !mySymbol) return;
 
     let timeoutId: NodeJS.Timeout | null = null;
-    let intervalTime = 2000; // Начинаем с 2 секунд
+          let intervalTime = 1500; // Более быстрая синхронизация
     let lastMoveNumber = gameStats.moveNumber;
     
     const sync = async () => {
