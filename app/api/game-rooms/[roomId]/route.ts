@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameRooms, updateGameRoom } from '../route';
+import { notifyGameUpdate, notifyPlayerAction } from '../stream/route';
 
 // Типы для крестиков-ноликов
 type CellType = 'X' | 'O' | null;
@@ -209,6 +210,15 @@ export async function POST(
         // Сохраняем изменения
         await updateGameRoom(roomId, room);
 
+        // 📡 Уведомляем всех игроков о ходе
+        notifyGameUpdate(roomId, { 
+          room, 
+          gameState,
+          undoMove,
+          action: 'move',
+          player: playerSymbol
+        });
+
         return NextResponse.json({ 
           success: true, 
           gameState,
@@ -221,6 +231,10 @@ export async function POST(
           status: 'finished', 
           updatedAt: new Date() 
         });
+
+        // 📡 Уведомляем о сдаче
+        notifyPlayerAction(roomId, 'surrender', { player });
+
         return NextResponse.json({ success: true });
       }
 
@@ -240,6 +254,13 @@ export async function POST(
             status: 'playing',
             winner: undefined,
             updatedAt: new Date() 
+          });
+
+          // 📡 Уведомляем о сбросе игры
+          notifyGameUpdate(roomId, { 
+            room: { ...room, gameState: newGameState }, 
+            action: 'reset',
+            player 
           });
           
           return NextResponse.json({ success: true, gameState: newGameState });
@@ -268,6 +289,12 @@ export async function POST(
         gameState.declineNotification = null; // Очищаем предыдущие уведомления
         
         await updateGameRoom(roomId, { gameState: gameState as any, updatedAt: new Date() });
+
+        // 📡 Уведомляем о запросе новой игры
+        notifyPlayerAction(roomId, 'new_game_request', { 
+          player, 
+          betAmount: gameState.newGameBet 
+        });
         
         return NextResponse.json({ success: true, message: 'New game requested' });
       }
@@ -325,6 +352,13 @@ export async function POST(
           winner: undefined,
           updatedAt: new Date() 
         });
+
+        // 📡 Уведомляем о начале новой игры
+        notifyGameUpdate(roomId, { 
+          room: { ...room, gameState: newGameState, betAmount: newBetAmount }, 
+          action: 'new_game_started',
+          player 
+        });
         
         return NextResponse.json({ success: true, gameState: newGameState });
       }
@@ -347,6 +381,12 @@ export async function POST(
         gameState.newGameBet = null;
         
         await updateGameRoom(roomId, { gameState: gameState as any, updatedAt: new Date() });
+
+        // 📡 Уведомляем об отклонении новой игры
+        notifyPlayerAction(roomId, 'new_game_declined', { 
+          player,
+          declinedPlayer: requesterAddress 
+        });
         
         // Очищаем уведомление через 10 секунд
         setTimeout(async () => {
