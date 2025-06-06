@@ -8,6 +8,7 @@ import { type GameRoom } from '@/hooks/useGameRooms';
 import { usePepeShells } from '@/hooks/usePepeShells';
 import ConnectionStatus from '../ConnectionStatus';
 import { apiClient } from '@/lib/apiClient';
+import GameChat from './GameChat';
 
 // Типы и интерфейсы для крестиков-ноликов
 type CellType = 'X' | 'O' | null;
@@ -1288,7 +1289,11 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
           </Board>
         </BoardContainer>
 
-        {/* TODO: Добавить чат для крестиков-ноликов */}
+        {/* Игровой чат */}
+        <GameChat 
+          gameRoomId={gameRoom?.id} 
+          title="🎯 ЧАТ ИГРЫ"
+        />
       </GameMainArea>
 
       <GameControls>

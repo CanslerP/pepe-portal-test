@@ -1,323 +1,466 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useRef } from 'react';
-import styled from 'styled-components';
-import { motion } from 'framer-motion';
-import { useActiveAccount } from "thirdweb/react";
+import styled from 'styled-components'
+import { motion } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { useActiveAccount } from "thirdweb/react"
+import { usePepeShells } from '@/hooks/usePepeShells'
+import StickerPicker from '../chat/StickerPicker'
 
-interface ChatMessage {
-  id: string;
-  player: string;
-  playerName: string;
-  message: string;
-  timestamp: Date;
-}
-
-interface GameChatProps {
-  gameRoomId: string;
-  messages: ChatMessage[];
-  onSendMessage: (message: string) => Promise<boolean>;
-}
-
-const ChatContainer = styled(motion.div)`
+const ChatContainer = styled.div`
+  width: 300px;
+  height: 500px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 2px solid var(--cyber-blue);
+  border-radius: 15px;
   display: flex;
   flex-direction: column;
-  width: 320px;
-  height: 420px;
-  background: rgba(0, 0, 0, 0.9);
-  border: 2px solid #00ffff;
-  border-radius: 15px;
   overflow: hidden;
-  backdrop-filter: blur(10px);
-  flex-shrink: 0;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
 
   @media (max-width: 1200px) {
+    width: 280px;
+    height: 400px;
+  }
+
+  @media (max-width: 600px) {
     width: 100%;
-    max-width: 420px;
     height: 300px;
   }
-`;
+`
 
 const ChatHeader = styled.div`
-  background: linear-gradient(45deg, #00ffff, #ff00ff);
-  color: #000;
-  padding: 10px 15px;
+  background: linear-gradient(90deg, var(--cyber-blue), var(--neon-pink));
+  padding: 10px;
   font-family: 'Press Start 2P', monospace;
   font-size: 0.7rem;
+  color: black;
   text-align: center;
-  font-weight: bold;
-`;
+  border-bottom: 2px solid var(--cyber-blue);
+`
 
-const MessagesContainer = styled.div`
+const MessagesArea = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  position: relative;
 
   &::-webkit-scrollbar {
     width: 6px;
   }
-
+  
   &::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.3);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #00ffff;
+    background: rgba(0, 255, 255, 0.1);
     border-radius: 3px;
   }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: #ff00ff;
+  
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(45deg, var(--cyber-blue), var(--neon-pink));
+    border-radius: 3px;
   }
-`;
+`
 
-const ScrollToBottomButton = styled.button<{ show: boolean }>`
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(45deg, #00ff00, #00ffff);
-  border: none;
-  color: #000;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: ${props => props.show ? 'flex' : 'none'};
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 10px rgba(0, 255, 255, 0.3);
-
-  &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-  }
-`;
-
-const MessageBubble = styled(motion.div)<{ isOwn: boolean }>`
-  max-width: 80%;
+const Message = styled(motion.div)<{ isOwn?: boolean }>`
   padding: 8px 12px;
-  border-radius: 15px;
-  background: ${props => props.isOwn 
-    ? 'linear-gradient(45deg, #ff00ff, #00ffff)' 
-    : 'rgba(255, 255, 255, 0.1)'};
-  color: ${props => props.isOwn ? '#000' : '#fff'};
+  border-radius: 10px;
+  max-width: 85%;
   align-self: ${props => props.isOwn ? 'flex-end' : 'flex-start'};
+  background: ${props => props.isOwn 
+    ? 'linear-gradient(135deg, var(--neon-pink), var(--cyber-blue))'
+    : 'rgba(255, 255, 255, 0.1)'
+  };
+  border: 1px solid ${props => props.isOwn ? 'transparent' : 'var(--cyber-blue)'};
   word-wrap: break-word;
-  border: 1px solid ${props => props.isOwn ? 'transparent' : '#333'};
-`;
+`
 
-const MessageMeta = styled.div<{ isOwn: boolean }>`
-  font-family: 'Orbitron', monospace;
+const MessageAuthor = styled.div`
+  font-family: 'Press Start 2P', monospace;
   font-size: 0.6rem;
-  color: ${props => props.isOwn ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)'};
+  color: var(--electric-yellow);
   margin-bottom: 4px;
-`;
+`
 
-const MessageText = styled.div`
-  font-family: 'Orbitron', monospace;
-  font-size: 0.8rem;
-  line-height: 1.3;
-`;
+const MessageContent = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isSticker',
+})<{ isSticker?: boolean }>`
+  color: white;
+  font-size: ${props => props.isSticker ? '2rem' : '0.8rem'};
+  font-family: ${props => props.isSticker ? 'inherit' : "'Orbitron', monospace"};
+  text-align: ${props => props.isSticker ? 'center' : 'left'};
+  line-height: 1.2;
+`
 
-const ChatInput = styled.div`
-  display: flex;
-  padding: 10px;
-  border-top: 1px solid #333;
-  gap: 8px;
-`;
-
-const InputField = styled.input`
-  flex: 1;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid #333;
+const StickerFile = styled.video`
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
   border-radius: 8px;
-  padding: 8px 12px;
-  color: #fff;
+  border: 1px solid var(--cyber-blue);
+`
+
+const StickerImage = styled.img`
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--cyber-blue);
+`
+
+const InputArea = styled.div`
+  border-top: 1px solid var(--cyber-blue);
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.5);
+`
+
+const InputForm = styled.form`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+`
+
+const MessageInput = styled.input`
+  flex: 1;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid var(--cyber-blue);
+  border-radius: 8px;
+  color: white;
   font-family: 'Orbitron', monospace;
   font-size: 0.8rem;
+  padding: 8px 12px;
+  transition: all 0.3s ease;
 
   &:focus {
     outline: none;
-    border-color: #00ffff;
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    border-color: var(--neon-pink);
   }
 
   &::placeholder {
     color: rgba(255, 255, 255, 0.5);
+    font-size: 0.7rem;
   }
-`;
 
-const SendButton = styled.button<{ disabled?: boolean }>`
-  background: ${props => props.disabled 
-    ? 'rgba(128, 128, 128, 0.3)' 
-    : 'linear-gradient(45deg, #00ff00, #00ffff)'};
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const SendButton = styled.button`
+  background: linear-gradient(45deg, var(--pepe-green), var(--cyber-blue));
   border: none;
-  border-radius: 8px;
-  padding: 8px 15px;
-  color: ${props => props.disabled ? '#666' : '#000'};
+  border-radius: 6px;
+  color: black;
   font-family: 'Orbitron', monospace;
   font-size: 0.7rem;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
   font-weight: bold;
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+
+  &:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+`
+
+const StickerButton = styled(motion.button)`
+  background: linear-gradient(45deg, var(--electric-yellow), var(--pepe-green));
+  border: none;
+  border-radius: 6px;
+  color: black;
+  font-size: 0.9rem;
+  padding: 8px;
+  cursor: pointer;
   transition: all 0.3s ease;
 
   &:hover:not(:disabled) {
     transform: scale(1.05);
-    box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
   }
-`;
 
-const EmptyState = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: rgba(255, 255, 255, 0.5);
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`
+
+const Timestamp = styled.div`
+  font-size: 0.5rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
   font-family: 'Orbitron', monospace;
-  font-size: 0.8rem;
-  text-align: center;
-`;
+`
 
-export default function GameChat({ gameRoomId, messages, onSendMessage }: GameChatProps) {
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const account = useActiveAccount();
+interface GameMessage {
+  id: string
+  content: string
+  type: 'text' | 'sticker'
+  author: {
+    address: string
+    nickname: string
+  }
+  timestamp: Date
+}
 
-  // Функция для проверки, внизу ли пользователь
-  const checkScrollPosition = () => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-      setShowScrollButton(!isAtBottom);
-    }
-  };
+interface GameChatProps {
+  gameRoomId?: string
+  title?: string
+}
 
-  // Автоматическая прокрутка к последнему сообщению (только если пользователь уже внизу)
+export default function GameChat({ gameRoomId, title = "🎮 ИГРОВОЙ ЧАТ" }: GameChatProps) {
+  const account = useActiveAccount()
+  const { balance } = usePepeShells()
+  
+  const [messages, setMessages] = useState<GameMessage[]>([])
+  const [inputMessage, setInputMessage] = useState('')
+  const [cooldown, setCooldown] = useState(0)
+  const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Кулдаун таймер
   useEffect(() => {
-    if (messagesEndRef.current && messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-      if (isAtBottom) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [cooldown])
+
+  // Автопрокрутка к последнему сообщению
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Загрузка сообщений
+  const loadMessages = async () => {
+    if (!gameRoomId) return
+
+    try {
+      const response = await fetch(`/api/game-rooms/${gameRoomId}/chat`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setMessages(data.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          })))
+        }
       }
+    } catch (error) {
+      console.error('Failed to load game chat messages:', error)
     }
-  }, [messages]);
+  }
 
-  // Функция для скролла к низу
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  };
+  // Синхронизация сообщений каждые 3 секунды
+  useEffect(() => {
+    if (!gameRoomId) return
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+    loadMessages()
+    const interval = setInterval(loadMessages, 3000)
+    return () => clearInterval(interval)
+  }, [gameRoomId])
+
+  // Отправка текстового сообщения
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
     
-    if (!inputMessage.trim() || isLoading || !account?.address) return;
-
-    setIsLoading(true);
-    const success = await onSendMessage(inputMessage.trim());
-    
-    if (success) {
-      setInputMessage('');
+    if (!inputMessage.trim() || !account?.address || balance < 1 || cooldown > 0 || !gameRoomId) {
+      return
     }
-    
-    setIsLoading(false);
-  };
 
-  const formatTimestamp = (timestamp: Date) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('ru', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+    try {
+      const messageData = {
+        content: inputMessage.trim(),
+        type: 'text',
+        author: {
+          address: account.address,
+          nickname: `Player_${account.address.slice(-6)}`
+        }
+      }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend(e);
+      const response = await fetch(`/api/game-rooms/${gameRoomId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageData)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setInputMessage('')
+          setCooldown(2) // 2 секунды кулдаун
+          await loadMessages()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error)
     }
-  };
+  }
+
+  // Отправка стикера
+  const handleStickerSelect = async (sticker: string) => {
+    if (!account?.address || balance < 1 || cooldown > 0 || !gameRoomId) return
+
+    try {
+      const messageData = {
+        content: sticker,
+        type: 'sticker',
+        author: {
+          address: account.address,
+          nickname: `Player_${account.address.slice(-6)}`
+        }
+      }
+
+      const response = await fetch(`/api/game-rooms/${gameRoomId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageData)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setCooldown(2) // 2 секунды кулдаун
+          setIsStickerPickerOpen(false)
+          await loadMessages()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send sticker:', error)
+    }
+  }
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('ru-RU', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })
+  }
 
   return (
-    <ChatContainer
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <ChatHeader>
-        💬 GAME CHAT
-      </ChatHeader>
-
-      <MessagesContainer 
-        ref={messagesContainerRef}
-        onScroll={checkScrollPosition}
-      >
-        {messages.length === 0 ? (
-          <EmptyState>
-            Начните разговор!<br />
-            Напишите первое сообщение
-          </EmptyState>
-        ) : (
-          messages.map((msg) => {
-            const isOwn = msg.player === account?.address;
+    <>
+      <ChatContainer>
+        <ChatHeader>
+          {title}
+        </ChatHeader>
+        
+        <MessagesArea>
+          {messages.map((message) => {
+            const isOwn = message.author.address === account?.address
+            
             return (
-              <MessageBubble
-                key={msg.id}
+              <Message
+                key={message.id}
                 isOwn={isOwn}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <MessageMeta isOwn={isOwn}>
-                  {isOwn ? 'Вы' : msg.playerName} • {formatTimestamp(msg.timestamp)}
-                </MessageMeta>
-                <MessageText>{msg.message}</MessageText>
-              </MessageBubble>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-        
-        <ScrollToBottomButton 
-          show={showScrollButton} 
-          onClick={scrollToBottom}
-          title="Скролл к низу"
-        >
-          ↓
-        </ScrollToBottomButton>
-      </MessagesContainer>
+                {!isOwn && (
+                  <MessageAuthor>
+                    {message.author.nickname}
+                  </MessageAuthor>
+                )}
+                
+                <MessageContent isSticker={message.type === 'sticker'}>
+                  {message.type === 'sticker' && message.content.startsWith('file:') ? (
+                    // Файл стикер
+                    (() => {
+                      const filename = message.content.replace('file:', '')
+                      const isVideo = filename.toLowerCase().endsWith('.webm') || filename.toLowerCase().endsWith('.gif')
+                      const stickerUrl = `/stickers/${filename}`
+                      
+                      return isVideo ? (
+                        <StickerFile
+                          src={stickerUrl}
+                          loop
+                          muted
+                          autoPlay
+                          playsInline
+                          title={filename}
+                        />
+                      ) : (
+                        <StickerImage 
+                          src={stickerUrl} 
+                          alt={filename}
+                          title={filename}
+                        />
+                      )
+                    })()
+                  ) : (
+                    // Эмодзи стикер или текст
+                    message.content
+                  )}
+                </MessageContent>
+                
+                <Timestamp>
+                  {formatTime(message.timestamp)}
+                </Timestamp>
+              </Message>
+            )
+          })}
+          <div ref={messagesEndRef} />
+        </MessagesArea>
 
-      <ChatInput>
-        <form onSubmit={handleSend} style={{ display: 'flex', width: '100%', gap: '8px' }}>
-          <InputField
-            type="text"
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Введите сообщение..."
-            maxLength={500}
-            disabled={isLoading}
-          />
-          <SendButton 
-            type="submit" 
-            disabled={!inputMessage.trim() || isLoading}
-          >
-            {isLoading ? '...' : '↑'}
-          </SendButton>
-        </form>
-      </ChatInput>
-    </ChatContainer>
-  );
+        <InputArea>
+          <InputForm onSubmit={handleSendMessage}>
+            <StickerButton
+              type="button"
+              onClick={() => setIsStickerPickerOpen(!isStickerPickerOpen)}
+              disabled={balance < 1 || cooldown > 0}
+              whileHover={balance >= 1 && cooldown === 0 ? { scale: 1.05 } : {}}
+              whileTap={balance >= 1 && cooldown === 0 ? { scale: 0.95 } : {}}
+              style={{
+                background: isStickerPickerOpen 
+                  ? 'linear-gradient(45deg, var(--neon-pink), var(--cyber-blue))'
+                  : 'linear-gradient(45deg, var(--electric-yellow), var(--pepe-green))'
+              }}
+            >
+              {isStickerPickerOpen ? '🎭' : '😀'}
+            </StickerButton>
+            
+            <MessageInput
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder={
+                balance < 1 
+                  ? 'Нужно 1+ SHELLS'
+                  : cooldown > 0
+                  ? `Подождите ${cooldown}с...`
+                  : 'Написать в игровой чат...'
+              }
+              disabled={balance < 1 || cooldown > 0}
+              maxLength={200}
+            />
+            
+            <SendButton
+              type="submit"
+              disabled={!inputMessage.trim() || balance < 1 || cooldown > 0}
+            >
+              📤
+            </SendButton>
+          </InputForm>
+        </InputArea>
+      </ChatContainer>
+      
+      {/* Picker стикеров */}
+      <StickerPicker
+        isOpen={isStickerPickerOpen}
+        onClose={() => setIsStickerPickerOpen(false)}
+        onStickerSelect={handleStickerSelect}
+      />
+    </>
+  )
 } 
