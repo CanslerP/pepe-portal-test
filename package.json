@@ -3,9 +3,11 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "next dev",
+        "dev": "node server.js",
         "build": "next build",
-        "start": "next start",
+        "start": "NODE_ENV=production node server.js",
+        "vercel:dev": "next dev",
+        "vercel:start": "next start",
         "lint": "next lint"
     },
     "dependencies": {
@@ -18,6 +20,7 @@
         "pino-pretty": "^10.3.1",
         "react": "^18",
         "react-dom": "^18",
+        "socket.io": "^4.7.0",
         "socket.io-client": "^4.7.0",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
