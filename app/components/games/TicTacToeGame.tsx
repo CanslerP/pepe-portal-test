@@ -534,7 +534,7 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     if (!gameRoom?.id) return;
 
     try {
-      const response = await fetch(`/api/game-rooms/${gameRoom.id}`);
+      const response = await fetch(`/api/game-rooms/room?id=${gameRoom.id}`);
       const data = await response.json();
       
       if (data.success && data.room.gameState) {

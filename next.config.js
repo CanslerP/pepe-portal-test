@@ -3,8 +3,7 @@ const nextConfig = {
   compiler: {
     styledComponents: true,
   },
-  output: 'standalone',
-  trailingSlash: true,
+  trailingSlash: false,
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
