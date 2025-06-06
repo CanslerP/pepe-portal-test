@@ -16,7 +16,7 @@ app.prepare().then(() => {
   const io = new Server(httpServer, {
     cors: {
       origin: process.env.NODE_ENV === 'production' 
-        ? ["https://pepe-portal.railway.app"] 
+        ? true  // Разрешаем все домены в production
         : ["http://localhost:3000"],
       methods: ["GET", "POST"]
     }
@@ -54,7 +54,10 @@ app.prepare().then(() => {
       
       try {
         // Здесь можно обрабатывать через ваш existing API
-        const response = await fetch(`http://localhost:${port}/api/game-rooms/${roomId}`, {
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? `http://127.0.0.1:${port}` 
+          : `http://localhost:${port}`;
+        const response = await fetch(`${baseUrl}/api/game-rooms/${roomId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(action)
