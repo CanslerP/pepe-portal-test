@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import { useActiveAccount } from "thirdweb/react";
 import { type GameRoom } from '@/hooks/useGameRooms';
 import { usePepeShells } from '@/hooks/usePepeShells';
+import ConnectionStatus from '../ConnectionStatus';
+import { apiClient } from '@/lib/apiClient';
 
 // Типы и интерфейсы для крестиков-ноликов
 type CellType = 'X' | 'O' | null;
@@ -500,6 +502,14 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     moveNumber: 0
   });
 
+  // Состояния для отслеживания соединения
+  const [connectionStatus, setConnectionStatus] = useState({
+    isConnected: true,
+    isRetrying: false,
+    retryAttempt: 0,
+    error: ''
+  });
+
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [mySymbol, setMySymbol] = useState<'X' | 'O' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -534,50 +544,78 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     if (!gameRoom?.id) return;
 
     try {
-      const response = await fetch(`/api/game-rooms/room?id=${gameRoom.id}`);
-      const data = await response.json();
+      // Обновляем статус соединения
+      setConnectionStatus(prev => ({ ...prev, isRetrying: true, error: '' }));
       
-      if (data.success && data.room.gameState) {
-        const gameState = data.room.gameState;
-        setBoard(gameState.board);
-        setGameStats({
-          currentPlayer: gameState.currentPlayer,
-          gameState: gameState.gameStatus,
-          winner: gameState.winner,
-          moveHistory: gameState.moveHistory || [],
-          moveNumber: gameState.moveNumber || 0
+      const result = await apiClient.getGameRoom(gameRoom.id);
+      
+      if (result.success && result.data?.room) {
+        const room = result.data.room;
+        
+        // Успешное соединение
+        setConnectionStatus({
+          isConnected: true,
+          isRetrying: false,
+          retryAttempt: 0,
+          error: ''
         });
         
-        // Синхронизируем запрос новой игры
-        setNewGameRequest(gameState.newGameRequest || null);
-        
-        // Обновляем ставку новой игры если есть запрос
-        if (gameState.newGameBet) {
-          setNewGameBet(gameState.newGameBet);
+        if (room.gameState) {
+          const gameState = room.gameState;
+          setBoard(gameState.board);
+          setGameStats({
+            currentPlayer: gameState.currentPlayer,
+            gameState: gameState.gameStatus,
+            winner: gameState.winner,
+            moveHistory: gameState.moveHistory || [],
+            moveNumber: gameState.moveNumber || 0
+          });
+          
+          // Синхронизируем запрос новой игры
+          setNewGameRequest(gameState.newGameRequest || null);
+          
+          // Обновляем ставку новой игры если есть запрос
+          if (gameState.newGameBet) {
+            setNewGameBet(gameState.newGameBet);
+          }
+          
+          // Проверяем уведомления об отклонении
+          if (gameState.declineNotification && gameState.declineNotification === account?.address) {
+            setNotification('🚫 Оппонент отклонил ваш запрос новой игры');
+            // Очищаем уведомление через 5 секунд
+            setTimeout(() => setNotification(null), 5000);
+          }
+          
+          // Проверяем, мой ли сейчас ход
+          if (mySymbol) {
+            const myTurn = gameState.currentPlayer === mySymbol;
+            setIsMyTurn(myTurn);
+            console.log(`Turn: ${gameState.currentPlayer} | Your turn: ${myTurn}`);
+          }
+        } else {
+          // Игра еще не начата, инициализируем начальное состояние
+          setIsMyTurn(mySymbol === 'X'); // X ходит первым
+          console.log('Game starting - X goes first');
         }
-        
-        // Проверяем уведомления об отклонении
-        if (gameState.declineNotification && gameState.declineNotification === account?.address) {
-          setNotification('🚫 Оппонент отклонил ваш запрос новой игры');
-          // Очищаем уведомление через 5 секунд
-          setTimeout(() => setNotification(null), 5000);
-        }
-        
-        // Проверяем, мой ли сейчас ход
-        if (mySymbol) {
-          const myTurn = gameState.currentPlayer === mySymbol;
-          setIsMyTurn(myTurn);
-          console.log(`Turn: ${gameState.currentPlayer} | Your turn: ${myTurn}`);
-        }
-      } else if (data.success && !data.room.gameState) {
-        // Игра еще не начата, инициализируем начальное состояние
-        setIsMyTurn(mySymbol === 'X'); // X ходит первым
-        console.log('Game starting - X goes first');
+      } else {
+        // Ошибка получения данных
+        setConnectionStatus({
+          isConnected: false,
+          isRetrying: false,
+          retryAttempt: 0,
+          error: result.error || 'Не удалось загрузить данные игры'
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading game state:', error);
+      setConnectionStatus({
+        isConnected: false,
+        isRetrying: false,
+        retryAttempt: 0,
+        error: 'Ошибка соединения'
+      });
     }
-  }, [gameRoom, mySymbol]);
+  }, [gameRoom, mySymbol, account?.address]);
 
   // Умная автоматическая синхронизация
   useEffect(() => {
@@ -721,25 +759,33 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     if (isLoading) return;
 
     setIsLoading(true);
+    
+    // Показываем оптимистичное обновление UI
+    const optimisticBoard = board.map(row => [...row]);
+    optimisticBoard[row][col] = mySymbol;
+    setBoard(optimisticBoard);
 
     try {
-      const response = await fetch(`/api/game-rooms/${gameRoom.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'makeMoveTicTacToe',
-          player: account.address,
-          move: { row, col }
-        })
-      });
+      // Обновляем статус соединения
+      setConnectionStatus(prev => ({ ...prev, isRetrying: true, error: '' }));
 
-      const data = await response.json();
+      const result = await apiClient.gameAction(gameRoom.id, {
+        action: 'makeMoveTicTacToe',
+        player: account.address,
+        move: { row, col }
+      });
       
-      if (data.success) {
-        // Обновляем локальное состояние
-        const gameState = data.gameState;
+      if (result.success && result.data) {
+        // Успешный ход
+        setConnectionStatus({
+          isConnected: true,
+          isRetrying: false,
+          retryAttempt: 0,
+          error: ''
+        });
+
+        // Обновляем состояние игры от сервера
+        const gameState = result.data.gameState;
         setBoard(gameState.board);
         setGameStats({
           currentPlayer: gameState.currentPlayer,
@@ -754,14 +800,14 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
         setNextToRemoveCell(null);
 
         // Показываем информацию об отменённом ходе
-        if (data.undoMove) {
-          const cellKey = `${data.undoMove.position.row}-${data.undoMove.position.col}`;
+        if (result.data.undoMove) {
+          const cellKey = `${result.data.undoMove.position.row}-${result.data.undoMove.position.col}`;
           
           // Добавляем клетку в список исчезающих для анимации
           setDisappearingCells(prev => new Set(prev).add(cellKey));
           
           // Показываем уведомление
-          setLastUndoMove(data.undoMove);
+          setLastUndoMove(result.data.undoMove);
           
           // Убираем анимацию и уведомление через 1 секунду
           setTimeout(() => {
@@ -776,12 +822,34 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
         
         console.log('✓ Move successful', gameState.moveNumber > 0 ? `- move #${gameState.moveNumber}` : '');
       } else {
-        console.error('Move failed:', data.error);
-        alert(data.error || 'Ошибка при выполнении хода');
+        // Откатываем оптимистичное обновление
+        setBoard(board);
+        
+        setConnectionStatus({
+          isConnected: false,
+          isRetrying: false,
+          retryAttempt: 0,
+          error: result.error || 'Ошибка выполнения хода'
+        });
+        
+        console.error('Move failed:', result.error);
+        setNotification(result.error || 'Ошибка при выполнении хода');
+        setTimeout(() => setNotification(null), 3000);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Откатываем оптимистичное обновление
+      setBoard(board);
+      
+      setConnectionStatus({
+        isConnected: false,
+        isRetrying: false,
+        retryAttempt: 0,
+        error: 'Ошибка соединения'
+      });
+      
       console.error('Error making move:', error);
-      alert('Ошибка соединения');
+      setNotification('Проблемы с соединением. Ход не выполнен.');
+      setTimeout(() => setNotification(null), 3000);
     } finally {
       setIsLoading(false);
     }
@@ -998,6 +1066,14 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
 
   return (
     <GameContainer>
+      {/* Статус соединения */}
+      <ConnectionStatus
+        isConnected={connectionStatus.isConnected}
+        isRetrying={connectionStatus.isRetrying}
+        retryAttempt={connectionStatus.retryAttempt}
+        error={connectionStatus.error}
+      />
+      
       <GameTitle>Evolving Tic-Tac-Toe</GameTitle>
       
       {/* Уведомления */}
