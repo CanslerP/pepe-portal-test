@@ -216,49 +216,70 @@ export default function GamesPage() {
   };
 
   const handleJoinGame = async (roomId: string) => {
-    if (!account?.address) return;
+    console.log('🎮 handleJoinGame called with roomId:', roomId);
+    
+    if (!account?.address) {
+      console.error('❌ No account address');
+      return;
+    }
+
+    console.log('👤 User account:', account.address);
 
     // Обновляем данные перед присоединением
     refreshRooms();
     
     // Ищем комнату среди всех доступных игр, а не только joinable
     const allGames = getAvailableGames();
+    console.log('🎯 Available games:', allGames.length);
     const room = allGames.find(r => r.id === roomId);
+    
     if (!room) {
+      console.error('❌ Room not found in available games');
       alert('Эта игра больше не доступна!');
       return;
     }
+    
+    console.log('📋 Found room:', room);
 
     // Проверяем, является ли пользователь создателем игры
     const isCreator = room.creator === account.address;
+    console.log('🏗️ Is creator:', isCreator);
     
     // Если не создатель, то проверяем доступность для присоединения и списываем ставку
     if (!isCreator) {
       const joinableGames = getJoinableGames();
       const joinableRoom = joinableGames.find(r => r.id === roomId);
       if (!joinableRoom) {
+        console.error('❌ Room not joinable');
         alert('Эта игра больше не доступна для присоединения!');
         return;
       }
 
+      console.log('💰 Deducting shells:', room.betAmount);
       // Списываем ставку только если присоединяемся, а не если это наша игра
       const success = await deductShells(room.betAmount, `Joining ${room.gameType} game vs ${room.creatorName}`);
       if (!success) {
+        console.error('❌ Failed to deduct shells');
         alert('Недостаточно PEPE SHELLS для присоединения к игре!');
         return;
       }
       
+      console.log('🤝 Joining game...');
       const joined = await joinGame(roomId, formatAddress(account.address));
       if (!joined) {
+        console.error('❌ Failed to join game');
         // Если присоединение не удалось, возвращаем ставку
         await addShells(room.betAmount, 'Game join failed - refund');
         alert('Не удалось присоединиться к игре!');
         return;
       }
+      console.log('✅ Successfully joined game');
     }
     
     // Перенаправляем на страницу игры
-    router.push(`/games/${roomId}`);
+    const gameUrl = `/games/${roomId}`;
+    console.log('🔄 Redirecting to:', gameUrl);
+    router.push(gameUrl);
   };
 
   const handleCancelGame = async (roomId: string) => {

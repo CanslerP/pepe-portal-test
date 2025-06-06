@@ -124,8 +124,15 @@ export default function GamePage({ params }: GamePageProps) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/game-rooms/room?id=${params.roomId}`);
+        console.log('🔍 Loading game room with ID:', params.roomId);
+        const apiUrl = `/api/game-rooms/room?id=${params.roomId}`;
+        console.log('🌐 API URL:', apiUrl);
+
+        const response = await fetch(apiUrl);
+        console.log('📡 Response status:', response.status);
+        
         const data = await response.json();
+        console.log('📊 Response data:', data);
 
         if (data.success && data.room) {
           // Преобразуем даты
@@ -134,12 +141,14 @@ export default function GamePage({ params }: GamePageProps) {
             createdAt: new Date(data.room.createdAt),
             updatedAt: data.room.updatedAt ? new Date(data.room.updatedAt) : undefined,
           };
+          console.log('✅ Game room loaded successfully:', room);
           setGameRoom(room);
         } else {
-          setError('Игровая комната не найдена');
+          console.error('❌ Game room not found:', data);
+          setError(data.error || 'Игровая комната не найдена');
         }
       } catch (err) {
-        console.error('Error loading game room:', err);
+        console.error('💥 Error loading game room:', err);
         setError('Ошибка загрузки игровой комнаты');
       } finally {
         setLoading(false);
@@ -147,7 +156,11 @@ export default function GamePage({ params }: GamePageProps) {
     };
 
     if (params.roomId) {
+      console.log('🚀 Starting to load game room with params:', params);
       loadGameRoom();
+    } else {
+      console.error('❌ No roomId in params:', params);
+      setError('ID игровой комнаты не найден в URL');
     }
   }, [params.roomId]);
 
