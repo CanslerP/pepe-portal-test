@@ -8,7 +8,6 @@ import { type GameRoom } from '@/hooks/useGameRooms';
 import { usePepeShells } from '@/hooks/usePepeShells';
 import ConnectionStatus from '../ConnectionStatus';
 import { apiClient } from '@/lib/apiClient';
-import { useGameSSE } from '@/hooks/useGameSSE';
 
 // Типы и интерфейсы для крестиков-ноликов
 type CellType = 'X' | 'O' | null;
@@ -492,47 +491,7 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
   const account = useActiveAccount();
   const { balance, addShells, deductShells, refreshBalance } = usePepeShells();
 
-  // 🚀 Новый SSE hook для real-time обновлений
-  const {
-    isConnected: sseConnected,
-    gameState: sseGameState,
-    playersOnline,
-    error: sseError,
-    reconnect: sseReconnect
-  } = useGameSSE({
-    roomId: gameRoom?.id || '',
-    onGameUpdate: (data) => {
-      console.log('🎮 SSE Game Update:', data);
-      if (data.room?.gameState) {
-        const gameState = data.room.gameState;
-        setBoard(gameState.board);
-        setGameStats({
-          currentPlayer: gameState.currentPlayer,
-          gameState: gameState.gameStatus,
-          winner: gameState.winner,
-          moveHistory: gameState.moveHistory || [],
-          moveNumber: gameState.moveNumber || 0
-        });
-        
-        // Обновляем статус хода
-        if (mySymbol) {
-          setIsMyTurn(gameState.currentPlayer === mySymbol);
-        }
 
-        // Обрабатываем undo move
-        if (data.undoMove) {
-          setLastUndoMove(data.undoMove);
-          setTimeout(() => setLastUndoMove(null), 2000);
-        }
-      }
-    },
-    onPlayerStatusChange: (data) => {
-      console.log('👤 SSE Player Status:', data);
-    },
-    onError: (error) => {
-      console.error('❌ SSE Error:', error);
-    }
-  });
   
   const [board, setBoard] = useState<CellType[][]>(() => 
     Array(3).fill(null).map(() => Array(3).fill(null))
@@ -545,23 +504,13 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     moveNumber: 0
   });
 
-  // Состояния для отслеживания соединения (теперь используем SSE)
+  // Состояния для отслеживания соединения
   const [connectionStatus, setConnectionStatus] = useState({
-    isConnected: sseConnected,
+    isConnected: true,
     isRetrying: false,
     retryAttempt: 0,
-    error: sseError || ''
+    error: ''
   });
-
-  // Обновляем статус соединения на основе SSE
-  useEffect(() => {
-    setConnectionStatus({
-      isConnected: sseConnected,
-      isRetrying: !sseConnected && !sseError,
-      retryAttempt: 0,
-      error: sseError || ''
-    });
-  }, [sseConnected, sseError]);
 
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [mySymbol, setMySymbol] = useState<'X' | 'O' | null>(null);
@@ -670,13 +619,45 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     }
   }, [gameRoom, mySymbol, account?.address]);
 
-  // 🚀 Начальная загрузка (SSE обеспечивает real-time обновления)
+  // 🔄 Оптимизированная синхронизация без SSE (безопасно для Vercel)
   useEffect(() => {
     if (!gameRoom?.id || !mySymbol) return;
+
+    let timeoutId: NodeJS.Timeout | null = null;
+    let intervalTime = 2000; // Начинаем с 2 секунд
+    let lastMoveNumber = gameStats.moveNumber;
     
-    // Загружаем только один раз, дальше SSE будет обновлять
-    loadGameState().catch(console.error);
-  }, [gameRoom?.id, mySymbol, loadGameState]);
+    const sync = async () => {
+      try {
+        await loadGameState();
+        
+        // Если есть изменения, делаем быструю проверку через 1 сек
+        if (gameStats.moveNumber !== lastMoveNumber) {
+          lastMoveNumber = gameStats.moveNumber;
+          intervalTime = 1000; // Быстро проверяем после изменений
+        } else {
+          // Нет изменений - увеличиваем интервал
+          intervalTime = gameStats.gameState === 'finished' ? 10000 : 3000;
+        }
+        
+        timeoutId = setTimeout(sync, intervalTime);
+      } catch (error) {
+        console.error('Sync error:', error);
+        timeoutId = setTimeout(sync, 5000); // При ошибке ждем 5 сек
+      }
+    };
+
+    // Начальная загрузка
+    loadGameState().then(() => {
+      timeoutId = setTimeout(sync, intervalTime);
+    });
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [gameRoom?.id, mySymbol, loadGameState, gameStats.moveNumber, gameStats.gameState]);
 
   // Определяем символ, который будет удалён следующим
   useEffect(() => {
@@ -772,6 +753,8 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     setBoard(optimisticBoard);
 
     try {
+      setConnectionStatus(prev => ({ ...prev, isRetrying: true, error: '' }));
+
       const result = await apiClient.gameAction(gameRoom.id, {
         action: 'makeMoveTicTacToe',
         player: account.address,
@@ -779,14 +762,45 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
       });
       
       if (result.success && result.data) {
-        // 🚀 SSE обновит состояние игры автоматически
+        setConnectionStatus({
+          isConnected: true,
+          isRetrying: false,
+          retryAttempt: 0,
+          error: ''
+        });
+
+        // Обновляем состояние игры от сервера
+        const gameState = result.data.gameState;
+        setBoard(gameState.board);
+        setGameStats({
+          currentPlayer: gameState.currentPlayer,
+          gameState: gameState.gameStatus,
+          winner: gameState.winner,
+          moveHistory: gameState.moveHistory || [],
+          moveNumber: gameState.moveNumber || 0
+        });
+        setIsMyTurn(gameState.currentPlayer === mySymbol);
+        
         // Убираем подсветку после хода
         setNextToRemoveCell(null);
+
+        // Показываем информацию об отменённом ходе
+        if (result.data.undoMove) {
+          setLastUndoMove(result.data.undoMove);
+          setTimeout(() => setLastUndoMove(null), 2000);
+        }
         
-        console.log('✓ Move successful', result.data.gameState?.moveNumber > 0 ? `- move #${result.data.gameState.moveNumber}` : '');
+        console.log('✓ Move successful', gameState.moveNumber > 0 ? `- move #${gameState.moveNumber}` : '');
       } else {
         // Откатываем оптимистичное обновление
         setBoard(board);
+        
+        setConnectionStatus({
+          isConnected: false,
+          isRetrying: false,
+          retryAttempt: 0,
+          error: result.error || 'Ошибка выполнения хода'
+        });
         
         console.error('Move failed:', result.error);
         setNotification(result.error || 'Ошибка при выполнении хода');
@@ -795,6 +809,13 @@ export default function TicTacToeGame({ gameRoom }: TicTacToeGameProps) {
     } catch (error: any) {
       // Откатываем оптимистичное обновление
       setBoard(board);
+      
+      setConnectionStatus({
+        isConnected: false,
+        isRetrying: false,
+        retryAttempt: 0,
+        error: 'Ошибка соединения'
+      });
       
       console.error('Error making move:', error);
       setNotification('Проблемы с соединением. Ход не выполнен.');
